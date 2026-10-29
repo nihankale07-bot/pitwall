@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pitwall"
+version = "0.1.0"
+description = "PITWALL race-strategy replay engine and pace model"
+readme = "README.md"
+authors = [{ name = "PITWALL Team" }]
+dependencies = [
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "pyarrow>=10.0.0",
+    "statsmodels>=0.14.0",
+    "scipy>=1.10.0",
+    "matplotlib>=3.7.0"
+]
+requires-python = ">=3.9"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pitwall*"]
