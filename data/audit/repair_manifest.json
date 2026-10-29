@@ -1,0 +1,14 @@
+{
+  "created_at_utc": "2026-10-25T11:31:06.588588+00:00",
+  "project": "PITWALL",
+  "purpose": "Controlled data integrity repairs",
+  "original_data_modified": false,
+  "repair_directory": "c:\\Users\\Nihan\\.vscode\\pitwall\\data\\repaired",
+  "notes": [
+    "Original processed datasets were not overwritten.",
+    "Fuel progress proxy is not physical fuel mass.",
+    "Grip defaults must be supported by documented feature semantics.",
+    "Feature availability must be validated separately from join integrity.",
+    "Historical compound medians are not causal tyre performance estimates."
+  ]
+}
