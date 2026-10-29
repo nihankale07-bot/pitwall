@@ -1,7 +1,7 @@
 """Replay engine for counterfactual strategy simulation."""
 
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Union
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
@@ -19,8 +19,15 @@ class Pit:
     compound: str
 
 
-# Type alias for actions
-Action = Union[Stay, Pit]
+@dataclass(frozen=True)
+class Strategy:
+    """Multi-stop strategy plan consisting of sequential (pit_lap, compound) stops."""
+    pit_sequence: Tuple[Tuple[int, str], ...] = field(default_factory=tuple)
+    description: str = ""
+
+
+# Type alias for actions / strategies
+Action = Union[Stay, Pit, Strategy]
 
 
 @dataclass
@@ -39,19 +46,52 @@ def replay(
     session_df: pd.DataFrame,
     target_driver: int,
     decision_lap: int,
-    action: Action,
+    strategy: Optional[Action] = None,
     pace_model=None,
     pit_loss: float = 22.0,
     track_mode: str = "replay",
-) -> ReplayResult:
+) -> Union[ReplayResult, Dict[str, ReplayResult]]:
     """Replay race with a counterfactual strategy for target_driver.
     
+    If strategy is None:
+        Auto-generates multi-stop strategy candidates via generate_multi_stop_candidates
+        and returns a dict of {strategy_id: ReplayResult}.
+        
     Laps <= decision_lap: actual data for everyone.
     Laps > decision_lap: rivals replay actual lap times. Target is simulated.
     """
     df = session_df
     max_race_laps = int(df["lap_number"].max())
     
+    # If strategy is None, auto-generate candidate strategies and replay each
+    if strategy is None:
+        from pitwall.strategy_generator import generate_multi_stop_candidates
+        cands = generate_multi_stop_candidates(df, target_driver, decision_lap)
+        results: Dict[str, ReplayResult] = {}
+        for _, r in cands.iterrows():
+            s_id = r["strategy_id"]
+            strat = Strategy(pit_sequence=tuple(r["pit_sequence"]), description=r["description"])
+            results[s_id] = replay(
+                session_df=df,
+                target_driver=target_driver,
+                decision_lap=decision_lap,
+                strategy=strat,
+                pace_model=pace_model,
+                pit_loss=pit_loss,
+                track_mode=track_mode,
+            )
+        return results
+
+    # Normalize strategy into a dictionary of pit stops {lap: new_compound}
+    if isinstance(strategy, Stay):
+        pit_schedule: Dict[int, str] = {}
+    elif isinstance(strategy, Pit):
+        pit_schedule: Dict[int, str] = {strategy.lap: strategy.compound}
+    elif isinstance(strategy, Strategy):
+        pit_schedule: Dict[int, str] = dict(strategy.pit_sequence)
+    else:
+        raise TypeError(f"Unsupported strategy type: {type(strategy)}")
+
     # Target driver's max recorded lap
     target_df = df[df["driver_number"] == target_driver].sort_values("lap_number")
     target_recorded_laps = int(target_df["lap_number"].max())
@@ -65,7 +105,6 @@ def replay(
     drivers = sorted(df["driver_number"].unique())
 
     # Pre-index driver lap durations and metadata into dicts
-    # (driver, lap) -> duration, compound, tyre_age
     actual_records = df.set_index(["driver_number", "lap_number"])[["lap_duration", "compound", "tyre_age", "position"]].to_dict(orient="index")
 
     # Target simulated laps
@@ -95,19 +134,16 @@ def replay(
     else:
         placeholder_pace = float(target_df[target_df["lap_number"] <= decision_lap]["lap_duration"].dropna().median())
 
-    # Determine pit lap and new compound if action is Pit
-    pit_lap = action.lap if isinstance(action, Pit) else -1
-    new_compound = action.compound if isinstance(action, Pit) else None
-
     # Simulate laps from decision_lap + 1 to sim_end_lap
     sim_compound = curr_compound
     sim_tyre_age = curr_tyre_age
 
     for l_num in range(decision_lap + 1, sim_end_lap + 1):
-        is_pit_now = (l_num == pit_lap)
+        is_pit_now = (l_num in pit_schedule)
         target_is_pit_lap[l_num] = is_pit_now
 
         if is_pit_now:
+            # In-lap is driven on current tyre + pit_loss
             base_tyre_age = sim_tyre_age + 1
             if pace_model is not None:
                 lap_time = pace_model.predict_lap(
@@ -126,8 +162,8 @@ def replay(
             target_sim_compounds[l_num] = sim_compound
             target_sim_tyre_ages[l_num] = base_tyre_age
 
-            # Switch compound for the next lap, starting at tyre_age 0
-            sim_compound = new_compound
+            # Switch compound for next lap, resetting tyre_age to 0
+            sim_compound = pit_schedule[l_num]
             sim_tyre_age = 0
         else:
             sim_tyre_age += 1
@@ -234,7 +270,7 @@ def replay(
         session_key=int(df["session_key"].iloc[0]) if "session_key" in df.columns else 9558,
         target_driver=target_driver,
         decision_lap=decision_lap,
-        action=action,
+        action=strategy,
         ground_truth_available=ground_truth_available,
         laps_table=result_df,
         summary=summary,

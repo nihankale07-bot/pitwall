@@ -78,69 +78,70 @@ def run_identity_test(
     pit_loss: float = 22.0,
     decision_laps: Optional[List[int]] = None,
 ) -> TestResult:
-    """Test B: Identity test (the key one).
+    """Test B: Identity test (multi-stop baseline comparison).
     
-    For each finisher with a real mid-race stop, and for decision laps D in {10, 20, 26, 35}
-    that precede their real stop, simulate the target with their REAL action (the real pit lap
-    and real new compound), then compare to history:
-    - error in target's total remaining time (simulated - actual), in seconds;
-    - error in final position.
+    For each finisher with a recorded pit sequence:
+    - For each decision_lap in decision_laps that precedes the first real pit:
+      - Generate all multi-stop candidates via generate_multi_stop_candidates
+      - Find the candidate that matches the real sequence (is_baseline=True)
+      - Run replay for that baseline candidate
+      - Compare simulated vs actual: time error, position error
     
     Pass target: median abs time error <= 8 s and >= 80% within 1 position.
     """
+    from pitwall.strategy_generator import generate_multi_stop_candidates
+    from pitwall.engine import Strategy
+
     if decision_laps is None:
         decision_laps = [10, 20, 26, 35]
 
     finishers = get_finishers(session_df)
     results = []
 
-    # Find real pit stops for each finisher
-    # In our data, pit in-lap has is_pit_in_lap == True, and the next lap is is_pit_out_lap == True with new compound
     for d in finishers:
         d_laps = session_df[session_df["driver_number"] == d].sort_values("lap_number")
-        
-        # Identify all real pit in-laps
-        pit_in_laps = d_laps[d_laps["is_pit_in_lap"]]
-        
-        for _, pit_row in pit_in_laps.iterrows():
-            real_pit_lap = int(pit_row["lap_number"])
-            # The compound after pit is on the next lap
-            next_laps = d_laps[d_laps["lap_number"] == real_pit_lap + 1]
-            if len(next_laps) == 0:
-                continue
-            real_new_compound = next_laps["compound"].iloc[0]
+        real_pits = d_laps[d_laps["is_pit_in_lap"]]
+        if len(real_pits) == 0:
+            continue
+        first_pit_lap = int(real_pits["lap_number"].min())
 
-            for d_lap in decision_laps:
-                if d_lap < real_pit_lap:
-                    # Run simulation with real action: Pit(lap=real_pit_lap, compound=real_new_compound)
-                    action = Pit(lap=real_pit_lap, compound=real_new_compound)
-                    res = replay(
-                        session_df=session_df,
-                        target_driver=d,
-                        decision_lap=d_lap,
-                        action=action,
-                        pace_model=pace_model,
-                        pit_loss=pit_loss,
-                    )
-                    
-                    # Remaining race error: total_time_delta_vs_actual
-                    time_err = res.summary["total_time_delta_vs_actual"]
-                    sim_pos = res.summary["final_position"]
-                    actual_pos = int(d_laps[d_laps["lap_number"] == session_df["lap_number"].max()]["position"].iloc[0])
-                    pos_err = sim_pos - actual_pos if sim_pos is not None else None
+        for d_lap in decision_laps:
+            # Evaluate decision laps preceding the first real pit stop (or subsequent stops if d_lap < race_length)
+            if d_lap < first_pit_lap or (d_lap == 35 and real_pits["lap_number"].max() > 35):
+                cands = generate_multi_stop_candidates(session_df, target_driver=d, decision_lap=d_lap)
+                base_cands = cands[cands["is_baseline"]]
+                if len(base_cands) == 0:
+                    continue
+                base_row = base_cands.iloc[0]
+                base_seq = tuple(base_row["pit_sequence"])
+                strat = Strategy(pit_sequence=base_seq, description=base_row["description"])
 
-                    results.append({
-                        "driver": d,
-                        "decision_lap": d_lap,
-                        "real_pit_lap": real_pit_lap,
-                        "real_new_compound": real_new_compound,
-                        "time_error_s": time_err,
-                        "abs_time_error_s": abs(time_err) if time_err is not None else None,
-                        "sim_final_pos": sim_pos,
-                        "actual_final_pos": actual_pos,
-                        "pos_error": pos_err,
-                        "abs_pos_error": abs(pos_err) if pos_err is not None else None,
-                    })
+                res = replay(
+                    session_df=session_df,
+                    target_driver=d,
+                    decision_lap=d_lap,
+                    strategy=strat,
+                    pace_model=pace_model,
+                    pit_loss=pit_loss,
+                )
+
+                time_err = res.summary["total_time_delta_vs_actual"]
+                sim_pos = res.summary["final_position"]
+                actual_pos = int(d_laps[d_laps["lap_number"] == session_df["lap_number"].max()]["position"].iloc[0])
+                pos_err = sim_pos - actual_pos if sim_pos is not None else None
+
+                results.append({
+                    "driver": d,
+                    "decision_lap": d_lap,
+                    "pit_sequence": base_row["pit_sequence_str"],
+                    "time_error_s": time_err,
+                    "abs_time_error_s": abs(time_err) if time_err is not None else None,
+                    "sim_final_pos": sim_pos,
+                    "actual_final_pos": actual_pos,
+                    "pos_error": pos_err,
+                    "abs_pos_error": abs(pos_err) if pos_err is not None else None,
+                })
+
 
     res_df = pd.DataFrame(results)
     if len(res_df) == 0:

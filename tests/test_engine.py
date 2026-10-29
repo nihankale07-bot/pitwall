@@ -26,7 +26,7 @@ def test_replay_actual_exact(race_data):
 
 def test_non_finisher_handling(race_data):
     """Engine refuses to claim final position for non-finisher beyond ground truth."""
-    res = replay(race_data, target_driver=63, decision_lap=20, action=Stay())
+    res = replay(race_data, target_driver=63, decision_lap=20, strategy=Stay())
     assert res.ground_truth_available is False
     assert res.summary["final_position"] is None
     assert res.summary["total_time_delta_vs_actual"] is None
