@@ -185,3 +185,9 @@ class PaceModel:
 
         predicted_time = self.intercept + lap_eff + driver_eff + compound_eff + (age_slope * tyre_age)
         return float(predicted_time)
+
+
+def fit_pace_model(df: pd.DataFrame, reference_compound: str = "MEDIUM") -> PaceModel:
+    """Convenience function to fit a PaceModel on session data."""
+    return PaceModel(reference_compound=reference_compound).fit(df)
+
