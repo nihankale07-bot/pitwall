@@ -162,8 +162,8 @@ class PaceModel:
         """Predict expected clean lap time for a driver on a lap.
         
         Modes:
-        - 'replay' (default): Uses the actual field lap effect for lap_number (known future track state).
-        - 'causal' (experimental): Persists the lap effect from decision_lap.
+        - 'replay': Uses actual field lap effects for historical replay.
+        - 'causal': Holds the decision-lap effect constant for future predictions.
         """
         if not self.fitted:
             raise ValueError("Model must be fitted before predicting.")

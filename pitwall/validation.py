@@ -60,8 +60,12 @@ def run_support_test(
     that no other driver ran for at least N=8 clean laps overlapping the simulated lap range.
     """
     start_lap, end_lap = sim_lap_range
+    required = {"is_clean_lap", "lap_number", "compound"}
+    missing = required - set(session_df.columns)
+    if missing:
+        return False, f"unsupported: session_df missing required columns {sorted(missing)}"
     clean_laps = session_df[
-        (session_df["is_clean_lap"]) &
+        (session_df["is_clean_lap"].fillna(False).astype(bool)) &
         (session_df["lap_number"] >= start_lap) &
         (session_df["lap_number"] <= end_lap) &
         (session_df["compound"] == candidate_compound)
@@ -165,15 +169,14 @@ def run_identity_test(
     late_results = {}
 
     if len(early_laps) > 0:
-        early_outliers = early_laps[early_laps["abs_time_error_s"] > 20.0]
-        early_normal = early_laps[early_laps["abs_time_error_s"] <= 20.0]
-        # Use outlier-excluded subset for metrics (outliers are likely pit-queue anomalies)
-        _eval = early_normal if len(early_normal) > 0 else early_laps
-        early_median_err = float(_eval["abs_time_error_s"].median())
-        early_within_1pos = float((_eval["abs_pos_error"] <= 1).mean())
+        # Score every scenario. Outliers may be diagnostically useful, but
+        # silently excluding them can make the acceptance result look better
+        # than the simulator actually performs.
+        early_median_err = float(early_laps["abs_time_error_s"].median())
+        early_within_1pos = float((early_laps["abs_pos_error"] <= 1).mean())
         early_results = {
-            "n_scenarios": len(_eval),
-            "n_outliers_excluded": len(early_outliers),
+            "n_scenarios": len(early_laps),
+            "n_outliers_excluded": 0,
             "median_abs_time_error_s": early_median_err,
             "pos_within_1_rate": early_within_1pos,
             "target_time_s": 15.0,

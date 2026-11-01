@@ -30,8 +30,16 @@ def measure_pit_loss(
     Returns:
     (green_flag_summary, sc_vsc_summary)
     """
+    if session_df is None or session_df.empty:
+        raise ValueError("session_df must contain race-lap data.")
+    required = {"driver_number", "lap_number", "lap_duration", "compound", "tyre_age", "is_pit_out_lap"}
+    missing = required - set(session_df.columns)
+    if missing:
+        raise ValueError(f"session_df is missing required columns: {sorted(missing)}")
+    if pace_model is None or not hasattr(pace_model, "predict_lap"):
+        raise ValueError("pace_model must provide predict_lap(...).")
     df = session_df.copy()
-    out_laps = df[df["is_pit_out_lap"]].copy()
+    out_laps = df[df["is_pit_out_lap"].fillna(False).astype(bool)].copy()
     
     stops = []
     for _, out_row in out_laps.iterrows():
@@ -67,7 +75,9 @@ def measure_pit_loss(
         )
         
         loss = (in_time + out_time) - (exp_in + exp_out)
-        is_sc = bool(in_row.get("is_sc_vsc_lap", False) or out_row.get("is_sc_vsc_lap", False))
+        in_sc = in_row.get("is_sc_vsc_lap", False)
+        out_sc = out_row.get("is_sc_vsc_lap", False)
+        is_sc = bool((pd.notna(in_sc) and in_sc) or (pd.notna(out_sc) and out_sc))
         
         stops.append({
             "driver_number": d,
@@ -83,7 +93,11 @@ def measure_pit_loss(
             "compound_after": out_row["compound"],
         })
         
-    stops_df = pd.DataFrame(stops)
+    stops_df = pd.DataFrame(stops, columns=[
+        "driver_number", "in_lap", "out_lap", "in_time", "out_time",
+        "exp_in", "exp_out", "pit_loss", "is_sc_vsc",
+        "compound_before", "compound_after",
+    ])
     
     def summarize(sub_df: pd.DataFrame) -> PitLossSummary:
         if len(sub_df) == 0:
