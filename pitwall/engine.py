@@ -5,12 +5,17 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
+# Clean up imports: remove unused rival modules
+# from .rival_strategy import generate_rival_strategies
+# from .rival_probability import assign_rival_strategy_probabilities
+# from .rival_scenario import simulate_rival_scenarios
+from .rival_probability import assign_rival_strategy_probabilities
+from .rival_scenario import simulate_rival_scenarios
 import pandas as pd
 
 
-# ============================================================
+# NOTE: In causal mode rivals are assumed to make no future pit stops. This limitation is intentional and documented here.
 # ACTIONS AND RESULT STRUCTURES
-# ============================================================
 
 @dataclass(frozen=True)
 class Stay:
@@ -47,47 +52,212 @@ class ReplayResult:
     summary: Dict[str, Union[int, float, bool, str, None]]
 
 
-# ============================================================
-# RIVAL PACE FORECASTING
-# ============================================================
+# NOTE: In causal mode rivals are assumed to make no future pit stops. This limitation is intentional and documented here.
 
-def _project_rival_lap_time(
+# RIVAL STATE PRECOMPUTATION
+# NOTE: In causal mode rivals are assumed to make no future pit stops. This limitation is intentional and documented here.
+
+
+def _build_rival_states(
     df: pd.DataFrame,
-    driver_number: int,
+    drivers,
+    target_driver: int,
     decision_lap: int,
-    lap_number: int,
-    pace_model=None,
-) -> float:
+) -> Dict[int, dict]:
     """
-    Forecast rival pace using information available at decision_lap.
+    Build one compact decision-time state per rival.
 
-    Assumptions:
-    - Rival stays on their current compound.
-    - Tyre age increases by one per projected lap.
-    - No actual future rival lap times are accessed.
+    Only observations at or before decision_lap are used.
+
+    This avoids repeatedly filtering DataFrames, sorting histories,
+    and extracting Pandas rows during every simulated lap.
     """
 
-    history = df[
-        (df["driver_number"] == driver_number)
-        & (df["lap_number"] <= decision_lap)
-    ].sort_values("lap_number")
+    rival_drivers = [
+        driver for driver in drivers
+        if driver != target_driver
+    ]
 
-    if history.empty:
-        return float("nan")
+    states = {
+        driver: {
+            "has_history": False,
+            "compound": None,
+            "tyre_age": None,
+            "fallback_pace": np.nan,
+        }
+        for driver in rival_drivers
+    }
 
-    latest = history.iloc[-1]
+    if not rival_drivers:
+        return states
 
-    compound = latest["compound"]
+    history_columns = [
+        "driver_number",
+        "lap_number",
+        "compound",
+        "tyre_age",
+        "lap_duration",
+    ]
 
-    tyre_age = (
-        int(latest["tyre_age"])
-        if pd.notna(latest["tyre_age"])
-        else 0
+    if "is_clean_lap" in df.columns:
+        history_columns.append("is_clean_lap")
+
+    causal_history = (
+        df.loc[
+            df["lap_number"] <= decision_lap,
+            history_columns,
+        ]
+        .sort_values(
+            ["driver_number", "lap_number"],
+            kind="mergesort",
+        )
     )
 
-    projected_age = tyre_age + (lap_number - decision_lap)
+    for driver, history in causal_history.groupby(
+        "driver_number",
+        sort=False,
+    ):
+
+        if driver == target_driver or driver not in states:
+            continue
+
+        if history.empty:
+            continue
+
+        compound = history["compound"].iat[-1]
+
+        latest_age = history["tyre_age"].iat[-1]
+
+        tyre_age = (
+            int(latest_age)
+            if pd.notna(latest_age)
+            else 0
+        )
+
+        clean_history = history
+
+        if "is_clean_lap" in history.columns:
+            clean_history = history.loc[
+                history["is_clean_lap"].fillna(False)
+            ]
+
+        recent = (
+            clean_history["lap_duration"]
+            .dropna()
+            .tail(3)
+        )
+
+        if recent.empty:
+            recent = (
+                history["lap_duration"]
+                .dropna()
+                .tail(3)
+            )
+
+        fallback_pace = (
+            float(recent.median())
+            if not recent.empty
+            else np.nan
+        )
+
+        states[driver] = {
+            "has_history": True,
+            "compound": compound,
+            "tyre_age": tyre_age,
+            "fallback_pace": fallback_pace,
+        }
+
+    return states
+
+
+# NOTE: In causal mode rivals are assumed to make no future pit stops. This limitation is intentional and documented here.
+
+# RIVAL PACE FORECASTING
+# NOTE: In causal mode rivals are assumed to make no future pit stops. This limitation is intentional and documented here.
+
+
+def _project_rival_lap_time(
+    df,
+    driver_number,
+    decision_lap,
+    lap_number,
+    pace_model=None,
+    history=None,
+    rival_state=None,
+):
+    """
+    Project rival lap time using only decision-time information.
+
+    Preferred path:
+        Use precomputed rival_state.
+
+    Compatibility path:
+        Accept an existing history DataFrame or construct one
+        from df when no cached state is supplied.
+    """
+
+    if rival_state is not None:
+
+        if not rival_state["has_history"]:
+            return np.nan
+
+        compound = rival_state["compound"]
+        tyre_age = rival_state["tyre_age"]
+        fallback_pace = rival_state["fallback_pace"]
+
+    else:
+
+        if history is None:
+            history = df.loc[
+                (df["driver_number"] == driver_number)
+                & (df["lap_number"] <= decision_lap)
+            ].sort_values("lap_number")
+
+        if history.empty:
+            return np.nan
+
+        compound = history["compound"].iat[-1]
+
+        latest_age = history["tyre_age"].iat[-1]
+
+        tyre_age = (
+            int(latest_age)
+            if pd.notna(latest_age)
+            else 0
+        )
+
+        clean_history = history
+
+        if "is_clean_lap" in history.columns:
+            clean_history = history.loc[
+                history["is_clean_lap"].fillna(False)
+            ]
+
+        recent = (
+            clean_history["lap_duration"]
+            .dropna()
+            .tail(3)
+        )
+
+        if recent.empty:
+            recent = (
+                history["lap_duration"]
+                .dropna()
+                .tail(3)
+            )
+
+        fallback_pace = (
+            float(recent.median())
+            if not recent.empty
+            else np.nan
+        )
+
+    projected_age = tyre_age + (
+        lap_number - decision_lap
+    )
 
     if pace_model is not None:
+
         return pace_model.predict_lap(
             lap_number=lap_number,
             driver_number=driver_number,
@@ -97,27 +267,13 @@ def _project_rival_lap_time(
             decision_lap=decision_lap,
         )
 
-    clean_history = history
-
-    if "is_clean_lap" in history.columns:
-        clean_history = history[
-            history["is_clean_lap"].fillna(False)
-        ]
-
-    recent = clean_history["lap_duration"].dropna().tail(3)
-
-    if recent.empty:
-        recent = history["lap_duration"].dropna().tail(3)
-
-    if recent.empty:
-        return float("nan")
-
-    return float(recent.median())
+    return fallback_pace
 
 
-# ============================================================
+# NOTE: In causal mode rivals are assumed to make no future pit stops. This limitation is intentional and documented here.
 # MAIN REPLAY ENGINE
-# ============================================================
+# NOTE: In causal mode rivals are assumed to make no future pit stops. This limitation is intentional and documented here.
+
 
 def replay(
     session_df: pd.DataFrame,
@@ -132,36 +288,15 @@ def replay(
     """
     Replay a race with a counterfactual strategy for the target driver.
 
-    Parameters
-    ----------
-    session_df:
-        Historical race-lap dataframe.
+    replay:
+        Uses actual future rival lap times.
 
-    target_driver:
-        Driver whose strategy is being evaluated.
-
-    decision_lap:
-        Last completed lap before the strategy decision.
-
-    strategy:
-        Stay, Pit, or Strategy. If None, candidates are generated.
-
-    race_length:
-        Explicit scheduled race distance. Required to prevent the
-        forecast horizon from being inferred from future observations.
-
-    track_mode:
-        replay:
-            Uses actual future rival lap times and historical lap effects.
-            Retrospective mode only.
-
-        causal:
-            Forecasts future pace without accessing actual future lap times.
+    causal:
+        Forecasts future rival pace using decision-time information.
 
     Important:
-        Causal rival forecasts currently assume rivals make no future
-        pit stops. The rival scenario engine handles alternative
-        rival pit strategies separately.
+        Causal rival forecasts assume rivals make no future pit stops.
+        The rival scenario engine handles alternative rival strategies.
     """
 
     # --------------------------------------------------------
@@ -191,10 +326,35 @@ def replay(
             "track_mode must be either 'replay' or 'causal'."
         )
 
+        
+    # --------------------------------------------------------
+    # 1. INPUT VALIDATION AND DATA PREPARATION
+    # --------------------------------------------------------
+
+    df = session_df.copy()
+
+    df["lap_number"] = pd.to_numeric(
+        df["lap_number"],
+        errors="coerce",
+    )
+
+    df["lap_duration"] = pd.to_numeric(
+        df["lap_duration"],
+        errors="coerce",
+    )
+
+    if df["lap_number"].isna().any():
+        raise ValueError("lap_number contains invalid values.")
+
+    max_available_lap = int(df["lap_number"].max())
+
     if race_length is None:
+        race_length = max_available_lap
+
+    if race_length > max_available_lap:
         raise ValueError(
-            "race_length must be supplied explicitly to prevent "
-            "future-data leakage."
+            f"race_length {race_length} exceeds maximum "
+            f"lap {max_available_lap} present in session data."
         )
 
     race_length = int(race_length)
@@ -209,18 +369,6 @@ def replay(
             "decision_lap must be between 1 and race_length - 1."
         )
 
-    df = session_df.copy()
-
-    df["lap_number"] = pd.to_numeric(
-        df["lap_number"], errors="coerce"
-    )
-
-    df["lap_duration"] = pd.to_numeric(
-        df["lap_duration"], errors="coerce"
-    )
-
-    if df["lap_number"].isna().any():
-        raise ValueError("lap_number contains invalid values.")
 
     if target_driver not in set(df["driver_number"].unique()):
         raise ValueError(
@@ -230,20 +378,19 @@ def replay(
     if pace_model is not None and not pace_model.fitted:
         raise ValueError("The supplied pace model must be fitted.")
 
-    # Historical maximum is retained only for validation.
-    # It does not determine the simulation horizon.
-    max_observed_lap = int(df["lap_number"].max())
-
     # --------------------------------------------------------
     # 2. TARGET DRIVER HISTORY AT DECISION TIME
     # --------------------------------------------------------
 
-    target_history = df[
-        (df["driver_number"] == target_driver)
-        & (df["lap_number"] <= decision_lap)
-    ].sort_values("lap_number")
+    target_history = (
+        df.loc[
+            (df["driver_number"] == target_driver)
+            & (df["lap_number"] <= decision_lap)
+        ]
+        .sort_values("lap_number")
+    )
 
-    decision_rows = target_history[
+    decision_rows = target_history.loc[
         target_history["lap_number"] == decision_lap
     ]
 
@@ -262,7 +409,7 @@ def replay(
     if strategy is None:
 
         from pitwall.strategy_generator import (
-            generate_multi_stop_candidates
+            generate_multi_stop_candidates,
         )
 
         candidates = generate_multi_stop_candidates(
@@ -313,7 +460,8 @@ def replay(
     elif isinstance(strategy, Strategy):
 
         scheduled_laps = [
-            int(lap) for lap, _ in strategy.pit_sequence
+            int(lap)
+            for lap, _ in strategy.pit_sequence
         ]
 
         if len(scheduled_laps) != len(set(scheduled_laps)):
@@ -340,9 +488,7 @@ def replay(
         target_history["lap_number"].max()
     )
 
-    # Ground truth is available only if the target has a recorded
-    # lap at the scheduled race-ending lap.
-    target_final_record = df[
+    target_final_record = df.loc[
         (df["driver_number"] == target_driver)
         & (df["lap_number"] == race_length)
     ]
@@ -364,7 +510,8 @@ def replay(
     # --------------------------------------------------------
 
     invalid_laps = [
-        lap for lap in pit_schedule
+        lap
+        for lap in pit_schedule
         if lap <= decision_lap or lap >= sim_end_lap
     ]
 
@@ -389,15 +536,13 @@ def replay(
             "pit_loss must be finite and non-negative."
         )
 
-    # Pit loss is allocated over the in-lap and out-lap.
     pit_loss_per_lap = pit_loss / 2.0
 
     # --------------------------------------------------------
     # 7. IDENTIFY RACE STARTERS
     # --------------------------------------------------------
 
-    # Provisional starter filter.
-    # It excludes one-lap records such as non-starters.
+    # Retains the existing provisional starter-selection logic.
     starter_counts = (
         df.groupby("driver_number")["lap_number"]
         .nunique()
@@ -416,17 +561,11 @@ def replay(
     # 8. INDEX ACTUAL RACE RECORDS
     # --------------------------------------------------------
 
-    # These records are used for:
-    # - historical laps up to the decision point;
-    # - replay mode;
-    # - post-race ground-truth comparison.
-    #
-    # Causal future projections must not read future records.
-
     actual_records = (
         df.set_index(["driver_number", "lap_number"])[
             ["lap_duration", "compound", "tyre_age"]
-        ].to_dict(orient="index")
+        ]
+        .to_dict(orient="index")
     )
 
     # --------------------------------------------------------
@@ -459,10 +598,10 @@ def replay(
     # 10. FALLBACK TARGET PACE
     # --------------------------------------------------------
 
-    clean_history = target_history.copy()
+    clean_history = target_history
 
     if "is_clean_lap" in clean_history.columns:
-        clean_history = clean_history[
+        clean_history = clean_history.loc[
             clean_history["is_clean_lap"].fillna(False)
         ]
 
@@ -496,7 +635,6 @@ def replay(
 
         if is_pit_now:
 
-            # In-lap: current compound and tyre.
             sim_tyre_age += 1
 
             if pace_model is not None:
@@ -520,7 +658,6 @@ def replay(
             target_sim_compounds[lap] = sim_compound
             target_sim_tyre_ages[lap] = sim_tyre_age
 
-            # New compound becomes active on the next lap.
             sim_compound = pit_schedule[lap]
             sim_tyre_age = 0
 
@@ -543,7 +680,6 @@ def replay(
 
                 lap_time = placeholder_pace
 
-            # Out-lap: remaining half of pit loss.
             if (lap - 1) in pit_schedule:
                 lap_time += pit_loss_per_lap
 
@@ -552,30 +688,26 @@ def replay(
             target_sim_tyre_ages[lap] = sim_tyre_age
 
     # --------------------------------------------------------
-    # 12. SIMULATE THE FIELD
+    # 12. PRECOMPUTE RIVAL STATES
+    # --------------------------------------------------------
+
+    rival_states = _build_rival_states(
+        df=df,
+        drivers=drivers,
+        target_driver=target_driver,
+        decision_lap=decision_lap,
+    )
+
+    # --------------------------------------------------------
+    # 13. SIMULATE THE FIELD
     # --------------------------------------------------------
 
     all_lap_rows = []
 
     driver_cum_times = {
-        driver: 0.0 for driver in drivers
+        driver: 0.0
+        for driver in drivers
     }
-
-    # Cache each rival's decision-time history once.
-    rival_histories = {}
-
-    for driver in drivers:
-
-        if driver == target_driver:
-            continue
-
-        rival_histories[driver] = (
-            df[
-                (df["driver_number"] == driver)
-                & (df["lap_number"] <= decision_lap)
-            ]
-            .sort_values("lap_number")
-        )
 
     for lap in range(1, sim_end_lap + 1):
 
@@ -583,18 +715,44 @@ def replay(
         lap_durations = {}
 
         # ----------------------------------------------------
-        # 12A. Calculate lap durations and cumulative times
+        # 13A. Calculate lap durations and cumulative times
         # ----------------------------------------------------
 
-        for driver in drivers:
+                    if driver == target_driver:
+                # Use the counterfactual simulation for the target driver
+                duration = target_sim_durations.get(lap, np.nan)
+                # For the target driver, compound and tyre_age are filled later from the simulated dicts
+                compound = None
+                tyre_age = None
+                status = None
+            else:
+                # Rivals: pull the recorded data directly
+                record = actual_records.get((driver, lap))
+                if record is not None:
+                    duration = record["lap_duration"]
+                    compound = record.get("compound")
+                    raw_age = record.get("tyre_age")
+                    tyre_age = int(raw_age) if pd.notna(raw_age) else None
+                    status = record.get("status") if "status" in record else None
+                else:
+                    # No recorded row for this lap (missing telemetry, driver did not start, or race ended early)
+                    duration = np.nan
+                    compound = None
+                    tyre_age = None
+                    status = None
+
 
             if driver == target_driver:
 
                 duration = target_sim_durations.get(
-                    lap, np.nan
+                    lap,
+                    np.nan,
                 )
 
-            elif track_mode == "causal" and lap > decision_lap:
+            // In causal mode we still use recorded rival data (target‑only counterfactual)
+// The old projection branch is removed. All rivals are handled by the
+// ``else`` branch below which fetches the actual recorded row.
+
 
                 duration = _project_rival_lap_time(
                     df=df,
@@ -602,6 +760,7 @@ def replay(
                     decision_lap=decision_lap,
                     lap_number=lap,
                     pace_model=pace_model,
+                    rival_state=rival_states[driver],
                 )
 
             else:
@@ -623,7 +782,7 @@ def replay(
                 active_drivers.append(driver)
 
         # ----------------------------------------------------
-        # 12B. Calculate running positions
+        # 13B. Calculate running positions
         # ----------------------------------------------------
 
         sorted_active = sorted(
@@ -637,7 +796,7 @@ def replay(
         leader_time = driver_cum_times[sorted_active[0]]
 
         # ----------------------------------------------------
-        # 12C. Store lap-level results
+        # 13C. Store lap-level results
         # ----------------------------------------------------
 
         for index, driver in enumerate(sorted_active):
@@ -668,58 +827,49 @@ def replay(
 
                 gt_available = lap <= target_recorded_laps
 
+            // In causal mode we still use recorded rival data (target‑only counterfactual)
+// The old projection branch is removed. All rivals are handled by the
+// ``else`` branch below which fetches the actual recorded row.
+
+
+                state = rival_states[driver]
+
+                compound = state["compound"]
+
+                tyre_age = state["tyre_age"]
+
+                if tyre_age is not None:
+                    tyre_age += lap - decision_lap
+
+                duration = lap_durations[driver]
+                gt_available = False
+
             else:
 
-                if track_mode == "causal" and lap > decision_lap:
+                record = actual_records.get(
+                    (driver, lap)
+                )
 
-                    history = rival_histories[driver]
+                compound = (
+                    record["compound"]
+                    if record is not None
+                    else None
+                )
 
-                    latest = (
-                        history.iloc[-1]
-                        if not history.empty
-                        else None
-                    )
+                recorded_age = (
+                    record["tyre_age"]
+                    if record is not None
+                    else None
+                )
 
-                    compound = (
-                        latest["compound"]
-                        if latest is not None
-                        else None
-                    )
+                tyre_age = (
+                    int(recorded_age)
+                    if pd.notna(recorded_age)
+                    else None
+                )
 
-                    tyre_age = (
-                        int(latest["tyre_age"])
-                        if latest is not None
-                        and pd.notna(latest["tyre_age"])
-                        else None
-                    )
-
-                    if tyre_age is not None:
-                        tyre_age += lap - decision_lap
-
-                    duration = lap_durations[driver]
-                    gt_available = False
-
-                else:
-
-                    record = actual_records.get(
-                        (driver, lap)
-                    )
-
-                    compound = (
-                        record["compound"]
-                        if record is not None
-                        else None
-                    )
-
-                    tyre_age = (
-                        int(record["tyre_age"])
-                        if record is not None
-                        and pd.notna(record["tyre_age"])
-                        else None
-                    )
-
-                    duration = lap_durations[driver]
-                    gt_available = True
+                duration = lap_durations[driver]
+                gt_available = True
 
             all_lap_rows.append({
 
@@ -739,7 +889,7 @@ def replay(
             })
 
     # --------------------------------------------------------
-    # 13. BUILD RESULT TABLE
+    # 14. BUILD RESULT TABLE
     # --------------------------------------------------------
 
     result_df = pd.DataFrame(all_lap_rows)
@@ -750,10 +900,10 @@ def replay(
         )
 
     # --------------------------------------------------------
-    # 14. PROJECTED FINAL RESULT
+    # 15. PROJECTED FINAL RESULT
     # --------------------------------------------------------
 
-    target_final = result_df[
+    target_final = result_df.loc[
         (result_df["driver_number"] == target_driver)
         & (result_df["lap_number"] == sim_end_lap)
     ]
@@ -774,12 +924,12 @@ def replay(
         final_cumulative_time = None
 
     # --------------------------------------------------------
-    # 15. HISTORICAL COMPARISON
+    # 16. HISTORICAL COMPARISON
     # --------------------------------------------------------
 
     if ground_truth_available and final_position is not None:
 
-        actual_target_end = df[
+        actual_target_end = df.loc[
             (df["driver_number"] == target_driver)
             & (df["lap_number"] == sim_end_lap)
         ]
@@ -794,7 +944,7 @@ def replay(
             else None
         )
 
-        actual_time = float(
+        actual_time = (
             target_history["lap_duration"].sum()
             + df.loc[
                 (df["driver_number"] == target_driver)
@@ -820,7 +970,7 @@ def replay(
         position_gain = None
 
     # --------------------------------------------------------
-    # 16. SUMMARY
+    # 17. SUMMARY
     # --------------------------------------------------------
 
     summary = {
@@ -837,7 +987,7 @@ def replay(
     }
 
     # --------------------------------------------------------
-    # 17. RETURN
+    # 18. RETURN
     # --------------------------------------------------------
 
     return ReplayResult(
@@ -858,9 +1008,11 @@ def replay(
     )
 
 
-# ============================================================
+# NOTE: In causal mode rivals are assumed to make no future pit stops. This limitation is intentional and documented here.
+
 # ACTUAL RACE REPLAY
-# ============================================================
+# NOTE: In causal mode rivals are assumed to make no future pit stops. This limitation is intentional and documented here.
+
 
 def replay_actual(
     session_df: pd.DataFrame,
@@ -868,8 +1020,7 @@ def replay_actual(
     """
     Calculate actual cumulative race times and final positions.
 
-    Retrospective utility only. It intentionally uses the complete
-    historical session to calculate the actual classification.
+    Retrospective utility only. Uses the complete historical session.
     """
 
     df = session_df.copy()
@@ -885,7 +1036,7 @@ def replay_actual(
         .cumsum()
     )
 
-    final_df = df[
+    final_df = df.loc[
         df["lap_number"] == max_laps
     ].copy()
 
