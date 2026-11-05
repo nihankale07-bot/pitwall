@@ -1,0 +1,45 @@
+{
+    "project": "PITWALL",
+    "report": "Final API Contract Validation",
+    "generated_at": "2026-11-01T15:56:38.592318+05:30",
+    "session_key": 9558,
+    "target_driver": 44,
+    "track_mode": "causal",
+    "execution_time_seconds": 36.891,
+    "ranking_count": 67,
+    "response_fields": [
+        "session_key",
+        "target_driver",
+        "decision_lap",
+        "race_length",
+        "track_mode",
+        "model",
+        "recommendation",
+        "ranking",
+        "best_replay"
+    ],
+    "ranking_fields": [
+        "is_baseline",
+        "pit_sequence",
+        "num_stops",
+        "projected_final_position",
+        "description",
+        "ground_truth_available",
+        "time_delta_vs_actual_s",
+        "projected_cumulative_time_s",
+        "positions_gained_vs_actual",
+        "pit_sequence_str",
+        "strategy_id"
+    ],
+    "checks": {
+        "response_structure": true,
+        "ranking_integrity": true,
+        "numerical_validity": true,
+        "strict_json_serialization": true,
+        "request_response_consistency": true,
+        "performance_measurement": true
+    },
+    "passed": 6,
+    "failed": 0,
+    "overall_status": "PASSED"
+}

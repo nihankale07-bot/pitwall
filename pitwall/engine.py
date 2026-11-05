@@ -718,15 +718,15 @@ def replay(
         # 13A. Calculate lap durations and cumulative times
         # ----------------------------------------------------
 
-                    if driver == target_driver:
-                # Use the counterfactual simulation for the target driver
-                duration = target_sim_durations.get(lap, np.nan)
-                # For the target driver, compound and tyre_age are filled later from the simulated dicts
-                compound = None
-                tyre_age = None
-                status = None
-            else:
-                # Rivals: pull the recorded data directly
+    if driver == target_driver:
+        # Use the counterfactual simulation for the target driver
+        duration = target_sim_durations.get(lap, np.nan)
+        # For the target driver, compound and tyre_age are filled later from the simulated dicts
+        compound = None
+        tyre_age = None
+        status = None
+    else:
+        # Rivals: pull the recorded data directly
                 record = actual_records.get((driver, lap))
                 if record is not None:
                     duration = record["lap_duration"]
@@ -742,16 +742,16 @@ def replay(
                     status = None
 
 
-            if driver == target_driver:
+    if driver == target_driver:
 
                 duration = target_sim_durations.get(
                     lap,
                     np.nan,
                 )
 
-            // In causal mode we still use recorded rival data (target‑only counterfactual)
-// The old projection branch is removed. All rivals are handled by the
-// ``else`` branch below which fetches the actual recorded row.
+#In causal mode we still use recorded rival data (target‑only counterfactual)
+#The old projection branch is removed. All rivals are handled by the
+# ``else`` branch below which fetches the actual recorded row.
 
 
                 duration = _project_rival_lap_time(
@@ -763,7 +763,7 @@ def replay(
                     rival_state=rival_states[driver],
                 )
 
-            else:
+    else:
 
                 record = actual_records.get(
                     (driver, lap)
@@ -775,9 +775,9 @@ def replay(
                     else np.nan
                 )
 
-            lap_durations[driver] = duration
-
-            if pd.notna(duration):
+    lap_durations[driver] = duration
+    
+    if pd.notna(duration):
                 driver_cum_times[driver] += float(duration)
                 active_drivers.append(driver)
 
@@ -785,21 +785,21 @@ def replay(
         # 13B. Calculate running positions
         # ----------------------------------------------------
 
-        sorted_active = sorted(
+    sorted_active = sorted(
             active_drivers,
             key=lambda driver: driver_cum_times[driver],
-        )
+    )
 
-        if not sorted_active:
+    if not sorted_active:
             continue
 
-        leader_time = driver_cum_times[sorted_active[0]]
+    leader_time = driver_cum_times[sorted_active[0]]
 
         # ----------------------------------------------------
         # 13C. Store lap-level results
         # ----------------------------------------------------
 
-        for index, driver in enumerate(sorted_active):
+    for index, driver in enumerate(sorted_active):
 
             cumulative_time = driver_cum_times[driver]
 
@@ -827,9 +827,9 @@ def replay(
 
                 gt_available = lap <= target_recorded_laps
 
-            // In causal mode we still use recorded rival data (target‑only counterfactual)
-// The old projection branch is removed. All rivals are handled by the
-// ``else`` branch below which fetches the actual recorded row.
+#In causal mode we still use recorded rival data (target‑only counterfactual)
+# The old projection branch is removed. All rivals are handled by the
+#``else`` branch below which fetches the actual recorded row.
 
 
                 state = rival_states[driver]

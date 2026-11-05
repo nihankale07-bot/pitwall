@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: pitwall
+Version: 0.1.0
+Summary: PITWALL race-strategy simulator and decision-support system
+Author: PITWALL Team
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: pyarrow>=10.0.0
+Requires-Dist: statsmodels>=0.14.0
+Requires-Dist: scipy>=1.10.0
+Requires-Dist: matplotlib>=3.7.0
+Requires-Dist: fastapi>=0.115.0
+Requires-Dist: uvicorn[standard]>=0.30.0

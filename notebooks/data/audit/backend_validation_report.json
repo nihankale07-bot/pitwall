@@ -1,0 +1,19 @@
+{
+    "project": "PITWALL",
+    "report": "Backend Validation",
+    "generated_at": "2026-11-01T15:53:59.156674+05:30",
+    "validation_results": {
+        "API startup and health": "PASSED",
+        "Session discovery": "PASSED",
+        "Driver discovery": "PASSED",
+        "Strategy optimization": "PASSED",
+        "Invalid input validation": "PASSED",
+        "Missing-data handling": "PASSED",
+        "Automated test suite": "PASSED",
+        "Causal-mode request": "PASSED"
+    },
+    "total_tests": 8,
+    "passed": 8,
+    "failed": 0,
+    "overall_status": "PASSED"
+}

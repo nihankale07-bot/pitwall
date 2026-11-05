@@ -25,12 +25,28 @@ def test_replay_actual_exact(race_data):
 
 
 def test_non_finisher_handling(race_data):
-    """Engine refuses to claim final position for non-finisher beyond ground truth."""
-    res = replay(race_data, target_driver=63, decision_lap=20, strategy=Stay())
-    assert res.ground_truth_available is False
-    assert res.summary["final_position"] is None
-    assert res.summary["total_time_delta_vs_actual"] is None
+    """
+    A non-finisher may receive a projected finishing position,
+    but must not be treated as having an observed race result.
+    """
 
+    res = replay(
+        race_data,
+        target_driver=63,
+        decision_lap=20,
+        strategy=Stay(),
+        race_length=52
+    )
+
+    # Actual ground truth is unavailable because the driver did not finish.
+    assert res.ground_truth_available is False
+
+    # The simulator may still project a finishing position.
+    assert res.summary["final_position"] is not None
+
+    # Actual race comparisons must remain unavailable.
+    assert res.summary["total_time_delta_vs_actual"] is None
+    assert res.summary["positions_gained_vs_actual"] is None
 
 def test_support_test(race_data):
     """Support test flags unsupported compounds."""

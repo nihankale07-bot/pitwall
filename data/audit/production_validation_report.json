@@ -1,0 +1,43 @@
+{
+    "status": "PASSED",
+    "request": {
+        "session_key": 9558,
+        "target_driver": 44,
+        "decision_lap": 26,
+        "race_length": 52,
+        "track_mode": "causal",
+        "pit_loss": 22.0,
+        "max_stops": 2,
+        "max_candidates": 95
+    },
+    "api_response_times_seconds": [
+        2.2035959999775514,
+        2.100726000033319,
+        1.9680335000157356
+    ],
+    "average_api_response_seconds": 2.0907851666755355,
+    "ranking_count": 67,
+    "recommended_strategy": {
+        "strategy_id": "S006",
+        "strategy": {
+            "strategy_id": "S006",
+            "pit_sequence": [
+                [
+                    31,
+                    "MEDIUM"
+                ]
+            ],
+            "pit_sequence_str": "MEDIUM lap 31",
+            "is_baseline": false,
+            "num_stops": 1,
+            "projected_final_position": 2,
+            "projected_cumulative_time_s": 5016.612148606212,
+            "time_delta_vs_actual_s": 69.18514860621235,
+            "positions_gained_vs_actual": -1,
+            "ground_truth_available": true,
+            "description": "Pit lap 31, fit MEDIUM"
+        },
+        "interpretation": "Historical counterfactual ranking. Rival future pace is replayed from observed data; this is not yet a live-race forecast.",
+        "objective": "projected_final_position_then_cumulative_time"
+    }
+}

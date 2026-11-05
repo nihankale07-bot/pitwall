@@ -1,0 +1,66 @@
+{
+    "project": "PITWALL",
+    "validation": "Backend Production Hardening",
+    "status": "PASSED",
+    "passed": 11,
+    "failed": 0,
+    "replay_execution_seconds": 5.586411800002679,
+    "replay_ranking_count": 67,
+    "tests": [
+        {
+            "test": "Replay optimization HTTP response",
+            "status": "PASSED",
+            "details": "HTTP 200, 5.586s"
+        },
+        {
+            "test": "Replay mode correctly identified",
+            "status": "PASSED",
+            "details": ""
+        },
+        {
+            "test": "Replay ranking populated",
+            "status": "PASSED",
+            "details": ""
+        },
+        {
+            "test": "Replay recommendation populated",
+            "status": "PASSED",
+            "details": ""
+        },
+        {
+            "test": "Replay output valid JSON",
+            "status": "PASSED",
+            "details": ""
+        },
+        {
+            "test": "Unknown driver rejected",
+            "status": "PASSED",
+            "details": "HTTP 400: {\"detail\":\"Driver 9999 does not exist in session 9558.\"}"
+        },
+        {
+            "test": "Decision lap beyond race length rejected",
+            "status": "PASSED",
+            "details": "HTTP 400: {\"detail\":\"decision_lap must be between 1 and race_length - 1.\"}"
+        },
+        {
+            "test": "Race length shorter than decision lap rejected",
+            "status": "PASSED",
+            "details": "HTTP 400: {\"detail\":\"decision_lap must be between 1 and race_length - 1.\"}"
+        },
+        {
+            "test": "Zero candidates rejected by schema",
+            "status": "PASSED",
+            "details": "HTTP 422"
+        },
+        {
+            "test": "Missing session handled safely",
+            "status": "PASSED",
+            "details": "HTTP 404"
+        },
+        {
+            "test": "Replay response contract",
+            "status": "PASSED",
+            "details": ""
+        }
+    ]
+}
