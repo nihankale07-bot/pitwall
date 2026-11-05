@@ -211,48 +211,20 @@ def run_strategy_optimization(
         .to_dict(orient="records")
     )
 
-    # Compute final projected race classification for all participating drivers
-    final_lap_records = best_replay.laps_table[
-        best_replay.laps_table["lap_number"] == race_length
-    ].sort_values("position")
-
     # --------------------------------------------------------
-    # 4. PROJECTED CLASSIFICATION – include non‑finishers
+    # 6. PROJECTED FULL-GRID CLASSIFICATION
     # --------------------------------------------------------
-    # Drivers that reached the final lap are marked as finished.
-    # Drivers that retired earlier are included with their last available cumulative time
-    # and a `finished: False` flag. Position may be None for retirees.
-    final_lap_records = best_replay.laps_table[
-        best_replay.laps_table["lap_number"] == race_length
-    ].copy()
-    final_lap_records["finished"] = True
+    if best_replay.classification is not None and not best_replay.classification.empty:
+        class_df = best_replay.classification
+    else:
+        class_df = best_replay.laps_table[
+            best_replay.laps_table["lap_number"] == race_length
+        ].sort_values("position")
 
-    # Identify drivers that did NOT reach the final lap
-    unfinished = (
-        best_replay.laps_table[best_replay.laps_table["lap_number"] < race_length]
-        .groupby("driver_number")["lap_number"]
-        .max()
-        .reset_index()
-    )
-    unfinished_rows = best_replay.laps_table.merge(
-        unfinished, on=["driver_number", "lap_number"], how="inner"
-    )
-    unfinished_rows["finished"] = False
-
-    # Combine and clean up
-    combined = pd.concat([final_lap_records, unfinished_rows], ignore_index=True)
-    # Ensure consistent column order and NaN handling
     projected_classification = (
-        combined.astype(object)
-        .where(pd.notna(combined), None)
+        class_df.astype(object)
+        .where(pd.notna(class_df), None)
         .to_dict(orient="records")
-    )
-
-    final_lap_records = (
-      final_lap_records
-      .astype(object)
-      .where(pd.notna(final_lap_records), None)
-       .to_dict(orient="records")
     )
 
     return {

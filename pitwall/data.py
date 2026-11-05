@@ -116,3 +116,49 @@ def get_finishers(df: pd.DataFrame) -> List[int]:
     max_race_laps = int(df["lap_number"].max())
     driver_max_laps = df.groupby("driver_number")["lap_number"].max()
     return sorted(list(driver_max_laps[driver_max_laps == max_race_laps].index))
+
+
+DRIVER_METADATA: Dict[int, Dict[str, Union[int, str]]] = {
+    1: {"driver_number": 1, "code": "VER", "name": "Max Verstappen", "team": "Red Bull Racing"},
+    2: {"driver_number": 2, "code": "SAR", "name": "Logan Sargeant", "team": "Williams"},
+    3: {"driver_number": 3, "code": "RIC", "name": "Daniel Ricciardo", "team": "RB"},
+    4: {"driver_number": 4, "code": "NOR", "name": "Lando Norris", "team": "McLaren"},
+    10: {"driver_number": 10, "code": "GAS", "name": "Pierre Gasly", "team": "Alpine"},
+    11: {"driver_number": 11, "code": "PER", "name": "Sergio Perez", "team": "Red Bull Racing"},
+    14: {"driver_number": 14, "code": "ALO", "name": "Fernando Alonso", "team": "Aston Martin"},
+    16: {"driver_number": 16, "code": "LEC", "name": "Charles Leclerc", "team": "Ferrari"},
+    18: {"driver_number": 18, "code": "STR", "name": "Lance Stroll", "team": "Aston Martin"},
+    20: {"driver_number": 20, "code": "MAG", "name": "Kevin Magnussen", "team": "Haas"},
+    22: {"driver_number": 22, "code": "TSU", "name": "Yuki Tsunoda", "team": "RB"},
+    23: {"driver_number": 23, "code": "ALB", "name": "Alexander Albon", "team": "Williams"},
+    24: {"driver_number": 24, "code": "ZHO", "name": "Zhou Guanyu", "team": "Kick Sauber"},
+    27: {"driver_number": 27, "code": "HUL", "name": "Nico Hulkenberg", "team": "Haas"},
+    31: {"driver_number": 31, "code": "OCO", "name": "Esteban Ocon", "team": "Alpine"},
+    44: {"driver_number": 44, "code": "HAM", "name": "Lewis Hamilton", "team": "Mercedes-AMG"},
+    55: {"driver_number": 55, "code": "SAI", "name": "Carlos Sainz", "team": "Ferrari"},
+    63: {"driver_number": 63, "code": "RUS", "name": "George Russell", "team": "Mercedes-AMG"},
+    77: {"driver_number": 77, "code": "BOT", "name": "Valtteri Bottas", "team": "Kick Sauber"},
+    81: {"driver_number": 81, "code": "PIA", "name": "Oscar Piastri", "team": "McLaren"},
+}
+
+
+def resolve_driver_number(df: pd.DataFrame, identifier: Union[int, str]) -> int:
+    """Resolve a driver number from driver number, code, or name using session data."""
+    if isinstance(identifier, int) or (isinstance(identifier, str) and identifier.isdigit()):
+        d_num = int(identifier)
+        if d_num in df["driver_number"].unique():
+            return d_num
+        raise ValueError(f"Driver number {d_num} not present in session data.")
+
+    clean_id = str(identifier).strip().lower()
+    for d_num, meta in DRIVER_METADATA.items():
+        if d_num in df["driver_number"].unique():
+            if (
+                meta["code"].lower() == clean_id
+                or meta["name"].lower() == clean_id
+                or clean_id in meta["name"].lower()
+            ):
+                return d_num
+
+    raise ValueError(f"Driver identifier '{identifier}' could not be resolved from session data.")
+
