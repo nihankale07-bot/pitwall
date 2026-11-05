@@ -77,7 +77,7 @@ def optimize_strategy(
         raise RuntimeError("No candidate strategies were generated.")
 
     if max_candidates is not None and len(candidates) > max_candidates:
-        # Keep the no-stop option and historical baselikeep = candidates[candidates["pit_sequence"].map(len) == 0]ne where possible, then
+        # Keep the no-stop option and historical baseline where possible, then
         # take a deterministic sample of remaining candidates.
         keep = candidates[candidates["pit_sequence"].map(len) == 0]
         keep = keep.drop_duplicates(subset=["pit_sequence"])

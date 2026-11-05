@@ -25,7 +25,7 @@ CALIBRATED_DEGRADATION = {
 
 REFERENCE_AGE = 25
 
-SUPPORTED_COMPOUNDS = {"SOFT", "MEDIUM", "HARD"}
+SUPPORTED_COMPOUNDS = {"SOFT", "MEDIUM", "HARD", "INTERMEDIATE"}
 
 
 # ============================================================
