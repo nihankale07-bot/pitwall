@@ -1,0 +1,39 @@
+=== PITWALL – Weather Validation Report ===
+
+1. ACTUAL RACE TOTALS
+   Piastri (81) – laps: 52, total time: 4959.839s
+   Hamilton (44) – laps: 52, total time: 4947.427s
+
+2. COUNTERFACTUAL SIMULATIONS (decision lap 26)
+   Piastri simulated total: 4987.581s
+   Hamilton simulated total: 4994.266s
+
+3. TIME DIFFERENCES
+   Δ_actual (Piastri – Hamilton) = 12.412s
+   Δ_counter (Piastri – Hamilton) = -6.684s
+   Improvement vs. Piastri actual = -27.742s
+   Improvement vs. Hamilton actual = -40.154s
+
+   No data‑quality warnings.
+
+4. WEATHER‑LAP ALIGNMENT SUMMARY
+   Missing weather rows: 1
+   Lag seconds – min: 0.02, max: 59.98
+
+5. FORWARD VALIDATION (train 1‑20 → test 21‑35)
+   Model               | MAE_all | RMSE_all | MAE_wet | RMSE_wet | MAE_dry | RMSE_dry
+   --------------------+---------+----------+---------+----------+----------+----------
+   baseline             |   4.618 |    7.616 |   4.618 |    7.616 |     N/A |      N/A
+
+6. RAINFALL IDENTIFIABILITY (full model with lap dummies)
+   Design matrix rank (lap dummies + rainfall): 40
+   Rainfall is identifiable (full rank).
+
+7. SIGNATURES OF KEY CLASSES / FUNCTIONS
+   PaceModel.__init__: (self, reference_compound: str = 'MEDIUM')
+   PaceModel.fit:    (self, df: pandas.DataFrame) -> 'PaceModel'
+   PaceModel.predict_lap: (self, lap_number: int, driver_number: int, compound: str, tyre_age: int, mode: str = 'replay', decision_lap: int | None = None) -> float
+   optimize_strategy: (session_df: 'pd.DataFrame', target_driver: 'int', decision_lap: 'int', race_length: 'int', pace_model: 'Any' = None, pit_loss: 'float' = 22.0, track_mode: 'str' = 'causal', max_stops: 'int' = 2, max_candidates: 'Optional[int]' = 95, supported_compounds: 'Optional[set]' = None) -> 'OptimizationResult'
+   engine.replay signature: (session_df: pandas.DataFrame, target_driver: int, decision_lap: int, strategy: pitwall.engine.Stay | pitwall.engine.Pit | pitwall.engine.Strategy | None = None, pace_model=None, pit_loss: float = 22.0, track_mode: str = 'replay', race_length: int | None = None) -> pitwall.engine.ReplayResult | Dict[str, pitwall.engine.ReplayResult]
+
+=== END OF REPORT ===

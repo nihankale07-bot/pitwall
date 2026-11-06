@@ -412,8 +412,11 @@ export const IntegratedWorkspace: React.FC<IntegratedWorkspaceProps> = ({
                 <div>
                   <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>DELTA VS BASELINE</div>
                   <div className="font-mono" style={{ fontSize: '1rem', fontWeight: 700, color: '#10B981' }}>
-                    {recommendedStrategy.time_delta_vs_actual_s > 0 ? '+' : ''}
-                    {recommendedStrategy.time_delta_vs_actual_s.toFixed(1)}s
+                    {recommendedStrategy.time_delta_vs_actual_s != null ? (
+                      `${recommendedStrategy.time_delta_vs_actual_s > 0 ? '+' : ''}${recommendedStrategy.time_delta_vs_actual_s.toFixed(1)}s`
+                    ) : (
+                      'N/A (DNF/Lapped)'
+                    )}
                   </div>
                 </div>
                 <div>
@@ -530,7 +533,11 @@ export const IntegratedWorkspace: React.FC<IntegratedWorkspaceProps> = ({
                             {s.projected_cumulative_time_s.toFixed(1)}s
                           </td>
                           <td style={{ padding: '5px 10px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
-                            {s.time_delta_vs_actual_s > 0 ? '+' : ''}{s.time_delta_vs_actual_s.toFixed(1)}s
+                            {s.time_delta_vs_actual_s != null ? (
+                              `${s.time_delta_vs_actual_s > 0 ? '+' : ''}${s.time_delta_vs_actual_s.toFixed(1)}s`
+                            ) : (
+                              'N/A'
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -772,7 +779,11 @@ export const IntegratedWorkspace: React.FC<IntegratedWorkspaceProps> = ({
                           </div>
                         </td>
                         <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
-                          {driver.position === 1 ? 'LEADER' : `+${driver.gap_to_leader.toFixed(1)}s`}
+                          {driver.position === 1
+                            ? 'LEADER'
+                            : driver.gap_to_leader != null
+                            ? `+${driver.gap_to_leader.toFixed(1)}s`
+                            : 'DNF'}
                         </td>
                         <td style={{ padding: '6px 8px', textAlign: 'right' }}>
                           <span className={`tyre-badge ${getCompoundBadge(driver.compound)}`} style={{ fontSize: '0.6rem', padding: '1px 4px' }}>

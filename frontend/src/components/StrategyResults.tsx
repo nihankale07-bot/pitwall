@@ -265,8 +265,11 @@ export const StrategyResults: React.FC<StrategyResultsProps> = ({
             <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '12px', borderRadius: '4px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>ACTUAL RACE DELTA</div>
               <div className="font-mono" style={{ fontSize: '1.25rem', fontWeight: 700, color: '#60A5FA', margin: '8px 0' }}>
-                {recommendation.strategy.time_delta_vs_actual_s > 0 ? '+' : ''}
-                {recommendation.strategy.time_delta_vs_actual_s.toFixed(1)}s
+                {recommendation.strategy.time_delta_vs_actual_s != null ? (
+                  `${recommendation.strategy.time_delta_vs_actual_s > 0 ? '+' : ''}${recommendation.strategy.time_delta_vs_actual_s.toFixed(1)}s`
+                ) : (
+                  'N/A'
+                )}
               </div>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                 vs Recorded finish
@@ -536,7 +539,11 @@ export const StrategyResults: React.FC<StrategyResultsProps> = ({
                       {(item.positions_gained_vs_actual ?? 0) >= 0 ? '+' : ''}{item.positions_gained_vs_actual ?? 0}
                     </td>
                     <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                      {item.time_delta_vs_actual_s > 0 ? '+' : ''}{item.time_delta_vs_actual_s.toFixed(1)}s
+                      {item.time_delta_vs_actual_s != null ? (
+                        `${item.time_delta_vs_actual_s > 0 ? '+' : ''}${item.time_delta_vs_actual_s.toFixed(1)}s`
+                      ) : (
+                        'N/A'
+                      )}
                     </td>
                     <td style={{ padding: '10px 14px' }}>
                       <button

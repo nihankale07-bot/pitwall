@@ -217,7 +217,11 @@ export const RaceReplay: React.FC<RaceReplayProps> = ({ data, sessionKey, target
                           </div>
                         </td>
                         <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
-                          {driver.position === 1 ? 'LEADER' : `+${driver.gap_to_leader.toFixed(2)}`}
+                          {driver.position === 1
+                            ? 'LEADER'
+                            : driver.gap_to_leader != null
+                            ? `+${driver.gap_to_leader.toFixed(2)}`
+                            : 'DNF'}
                         </td>
                         <td style={{ padding: '6px 10px', textAlign: 'right' }}>
                           <span className={`tyre-badge ${getCompoundBadgeClass(driver.compound)}`} style={{ fontSize: '0.62rem', padding: '1px 5px' }}>
@@ -431,7 +435,11 @@ export const RaceReplay: React.FC<RaceReplayProps> = ({ data, sessionKey, target
             <div style={{ backgroundColor: 'var(--bg-card)', padding: '10px', borderRadius: '4px' }}>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>GAP TO LEADER</div>
               <div className="font-mono" style={{ fontSize: '1.1rem', fontWeight: 700, color: '#FFFFFF', marginTop: '3px' }}>
-                {activeTargetRecord ? `+${activeTargetRecord.gap_to_leader.toFixed(2)}s` : '+0.84s'}
+                {activeTargetRecord
+                  ? activeTargetRecord.gap_to_leader != null
+                    ? `+${activeTargetRecord.gap_to_leader.toFixed(2)}s`
+                    : 'N/A'
+                  : '+0.84s'}
               </div>
               <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Time delta</div>
             </div>
